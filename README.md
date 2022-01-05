@@ -1,6 +1,6 @@
 # AnilistScraper
 
-Born to visualise how many episodes I and my friends have seen in time.
+Born to visualise how many episodes my friends and I have seen in time.
 
 Worked by scraping the anilist website to
 
@@ -59,7 +59,7 @@ Two queries, like before. One to get the users I follow, the other to retrieve t
 ## Generate graph
 
 This script runs daily. As I'm ultimately interested in having a visual representation of the data I'm also automatically creating a png, with [graphCreator.py](graphCreator.py):
-![](-epVisti.png)
+![](epVisti.png)
 
 
 ## CSV or InfluxDB
