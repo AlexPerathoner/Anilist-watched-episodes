@@ -8,9 +8,6 @@ import numpy as np
 
 
 if __name__ == '__main__':
-	f = open("/Users/alex/AppsMine/AnilistScraper/demofile3.txt", "w")
-	f.write("Woops! I have deleted the content!")
-	f.close()
 	if os.path.isfile('/Users/alex/AppsMine/AnilistScraper/historyStats.csv'):
 		df = pd.read_csv('/Users/alex/AppsMine/AnilistScraper/historyStats.csv')
 	
@@ -40,8 +37,4 @@ if __name__ == '__main__':
 	fig.set_size_inches(18.5, 18.5)
 	fig.savefig(path, dpi=200)
 
-
-	f = open("/Users/alex/AppsMine/AnilistScraper/demofile3.txt", "w")
-	f.write("here we go!")
-	f.close()
 	#plt.show()

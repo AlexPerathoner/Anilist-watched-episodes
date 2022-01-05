@@ -2,56 +2,40 @@ import os
 from datetime import datetime
 
 import requests
-import sys
 import pandas as pd
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from subprocess import Popen, PIPE
 
-token = "m3_qTJNHan6NP0jFkdkLjFUdtNy5cCnFnQpWQVfDDUXQtmMf8o-udOP8t9yxPDKQHkvKqPtvJpKLdO-FaoG4mQ=="
+
+with open('old-other/token') as f:
+    token = f.read()
+
 org = "AlexPera"
 bucket = "AnilistStats"
 
-chrome_options = Options()
-chrome_options.add_argument('disable-blink-features=AutomationControlled')
-chrome_options.add_argument('user-agent=Chrome')
-chrome_options.add_argument('--headless')
-
-browser = webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=chrome_options)
-
-
 def getEpSeen(name):
+    query = '''
+    query($name:String) {
+    User(name: $name) {
+        statistics {
+        anime {
+            episodesWatched
+        }
+        }
+    }
+    }
+    '''
+    # Define our query variables and values that will be used in the query request
+    variables = {
+        'name': name
+    }
 
-	os.environ['WDM_LOG_LEVEL'] = '0'
-	if(name == ""):
-		name = sys.argv[1]
-	url = 'https://anilist.co/user/'+name+'/stats/anime/overview'
-	delay = 5
-
-	browser.get(url)
-
-	val = []
-	count = -1
-	try:
-		WebDriverWait(browser, delay).until(
-			EC.presence_of_element_located((By.CSS_SELECTOR, ".value"))
-		)
-		val = browser.find_elements_by_class_name("value") 
-		print(name + ": " + val[1].text)
-		count = val[1].text
-
-	except TimeoutException:
-		print("Failed to load ep seen by " + name)
-
-	return count
+    url = 'https://graphql.anilist.co'
+    # Make the HTTP Api request
+    response = requests.post(url, json={'query': query, 'variables': variables}).json()
+    return response["data"]["User"]["statistics"]["anime"]["episodesWatched"]
 
 
 def request(id, page):
@@ -113,6 +97,7 @@ if(df.columns[-1] != today):
 	df[today] = -1
 for user in users:
 	epCount = getEpSeen(user)
+	print(user + ": " + str(epCount))
 	#check if user doesn't exists yet
 	if (len(df[df['name'] == user]) == 0):
 		#creating one
@@ -139,10 +124,9 @@ with InfluxDBClient(url="http://localhost:8086", token=token, org=org) as client
 				.field("viewed_episodes", count) \
 				.time(dateObj, WritePrecision.NS)
 			
-			#write_api.write(bucket, org, point)
+			write_api.write(bucket, org, point)
 
 
-browser.quit()
 
 script = 'display notification "Finished running ANILIST script" with title "Added all data to Influx!"'
 p = Popen(['osascript', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True)
