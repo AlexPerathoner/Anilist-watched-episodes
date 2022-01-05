@@ -1,4 +1,1 @@
-influxdb token
-influxdb organisation name
-influxdb bucket
-path to project
+<influxdb token> <influxdb organisation name> <influxdb bucket> <path to project>
