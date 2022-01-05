@@ -28,8 +28,8 @@ Two queries, like before. One to get the users I follow, the other to retrieve t
 
 1. Get following:
 
-	```
-	query ($page: Int, $perPage: Int) {
+	```graphql
+	query($page: Int, $perPage: Int) {
 	    Page(page: $page, perPage: $perPage) {
 	        pageInfo {
 	            total
@@ -42,7 +42,7 @@ Two queries, like before. One to get the users I follow, the other to retrieve t
 	}
 	```
 
-1. Get #:
+1. Get number of eps:
 
 	```graphql
 	query($name:String) {
@@ -58,8 +58,8 @@ Two queries, like before. One to get the users I follow, the other to retrieve t
 
 ## Generate graph
 
-This script runs daily. As I'm ultimately interested in having a visual representation of the data I'm also automatically creating a png, with [graphCreator.py](graphCreator.py):
-![](epVisti.png)
+This script runs daily. As I'm ultimately interested in having a visual representation, but just of some data, I wanted to do this automatically, as well. Creating the png is handled by [graphCreator.py](graphCreator.py):
+![](-epVisti.png)
 
 
 ## CSV or InfluxDB
@@ -67,3 +67,29 @@ This script runs daily. As I'm ultimately interested in having a visual represen
 This script uses the same csv structure I used for other projects. However, as there are significantly less values it didn't have the problems the others did.
 
 Though it was unnecessary I decided to add the data to Influx anyway, to have a backup and to have some more flexible visualizations, if needed.
+
+
+## Launchd
+
+As already mentioned everything should run daily automatically. To do this I set up a service in LaunchAgents:
+
+```
+<key>ProgramArguments</key>
+<array>
+	<string>(path-to-project)/script.sh</string>
+</array>
+<key>RunAtLoad</key>
+<false/>
+<key>StartCalendarInterval</key>
+<array>
+	<dict>
+		<key>Hour</key>
+		<integer>18</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+</array>
+
+```
+
+This agent runs [script.sh](script.sh) at 6pm every day. The script just runs the two python scripts showed above; if they fail it shows a notification.
