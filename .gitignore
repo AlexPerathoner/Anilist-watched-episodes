@@ -2,3 +2,5 @@
 config
 old-other
 *.log
+*.csv
+*.png
