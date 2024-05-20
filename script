@@ -1,0 +1,11 @@
+#!/usr/bin/env zsh
+
+
+workdir="/Users/alex/AppsMine/AnilistScraper"
+
+cd $workdir
+
+source env/bin/activate
+/usr/local/bin/python3.11 "$workdir/csvcreator.py" || /usr/bin/osascript -e 'display notification "Could not run ANILIST script"';
+/usr/local/bin/python3.11 "$workdir/graphCreator.py" || /usr/bin/osascript -e 'display notification "Could not run ANILIST script (graph creator)"';
+

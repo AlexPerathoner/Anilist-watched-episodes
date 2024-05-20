@@ -7,6 +7,7 @@ import time
 
 import requests
 import pandas as pd
+import numpy as np
 
 IMPORTANT_USERS = ["Piede", "OneGles", "Suzuju"]
 
@@ -48,7 +49,7 @@ def get_ep_seen(name, max_retries):
         print("Resuming...")
         return get_ep_seen(name, max_retries)
 
-    if(response["data"] is not None and response["data"]["User"] is not None):
+    if("data" in response and response["data"] is not None and response["data"]["User"] is not None):
         return response["data"]["User"]["statistics"]["anime"]["episodesWatched"]
     else:
         print("Couldn't retrieve stats of " + name)
@@ -98,16 +99,91 @@ def get_following(user_id):
         followers = followers + response['data']['Page']['following'] # appending users
     return convert_to_list(followers)
 
-def try_resolve_sus_users(dataframe, sus_users):
-    for sus_user in sus_users:
-        # find all columns where the user has a value different from -1
+def is_user_present(value):
+    res = not ((isinstance(value, np.float64) or isinstance(value, float)) and np.isnan(value)) and (value != 0.0)
+    # print(str(res) + " " + str(type(value)) + " " + str(value) + " " + str(isinstance(value, np.float64)) + " " + str(isinstance(value, float)) + " " + str(np.isnan(value)) + " " + str(value != 0.0))
+    return res
+
+def parse_date(date_str):
+    return datetime.strptime(date_str, '%Y%m%d')
+
+def try_resolve_sus_users(dataframe, sus_users, following_users):
+    print("Finding first appearence for all following users...")
+    # for all following_users, check what is the first column where the user is present
+    following_users_first_appearence = {}
+    for user in following_users + list(sus_users):
         columns = []
         for column in dataframe.columns:
-            if dataframe.loc[dataframe['name'] == sus_user, column].values[0] != -1:
-                columns.append(column)
-        
-        print(columns)
-        print("Last column with value for user " + sus_user + ": " + columns.sort()[-1])
+            cell_value = dataframe.loc[dataframe['name'] == user, column].values[0]
+            if column == 'name':
+                continue
+            if is_user_present(cell_value):
+                columns.append({"column": column, "value": cell_value})
+        columns.sort(key=lambda x: x["column"])
+        if len(columns) == 0:
+            print("ERROR: User " + user + " has no values")
+            continue
+        following_users_first_appearence[user] = columns[0]
+    print("First appearence for all following users found" + str(following_users_first_appearence))
+
+    for sus_user in sus_users:
+        print("\nResolving sus user " + sus_user)
+        columns = []
+        for column in dataframe.columns: # find last column with value != -1 (user still existed at that time)
+            cell_value = dataframe.loc[dataframe['name'] == sus_user, column].values[0]
+            if column == 'name':
+                continue
+            if is_user_present(cell_value):
+                columns.append({"column": column, "value": cell_value})
+        columns.sort(key=lambda x: x["column"])
+        if len(columns) == 0:
+            print("ERROR: User " + sus_user + " has no values")
+            continue
+        last_appearence = columns[-1]
+        # check if there is a user that has first appearence on that day or after and has same or greater value 
+        # if so, we can assume that the user is the same
+        possible_users = []
+        for user, first_appearence in following_users_first_appearence.items():
+            if user == sus_user:
+                continue
+            if parse_date(first_appearence["column"]) >= parse_date(last_appearence["column"]):
+                if first_appearence["value"] >= last_appearence["value"]:
+                    possible_users.append({"user": user, "first_appearence": first_appearence})
+
+        possible_users.sort(key=lambda x: x["first_appearence"]["column"])
+        print("lastAppearence: " + str(last_appearence))
+        for user in possible_users:
+            # print spaces to make sure the stuff after is aligned
+            # get index of column last_appearence["column"] in dataframe columns
+            index_last = dataframe.columns.get_loc(last_appearence["column"])
+            index_first = dataframe.columns.get_loc(user["first_appearence"]["column"])
+
+            columns_between = index_first - index_last
+            print("\t" + user["user"].ljust(20) + " - since " + user["first_appearence"]["column"] + "(" + str(columns_between) + ") with " + str(user["first_appearence"]["value"]))
+            if columns_between <= 1:
+                # most probably the same user, skipping the rest
+                break
+
+def merge_sus_users(dataframe, sus_users_mapping):
+    for sus_user, user in sus_users_mapping.items():
+        for column in dataframe.columns:
+            if len(dataframe.loc[dataframe['name'] == sus_user, column].values) == 0: # todo not working
+                continue
+            sus_value = dataframe.loc[dataframe['name'] == sus_user, column].values[0]
+            if len(dataframe.loc[dataframe['name'] == user, column].values) == 0:
+                if is_user_present(sus_value):
+                    dataframe.loc[dataframe['name'] == user, column] = sus_value
+            else:
+                user_value = dataframe.loc[dataframe['name'] == user, column].values[0]
+                if is_user_present(sus_value) and not is_user_present(user_value):
+                    dataframe.loc[dataframe['name'] == user, column] = sus_value
+                elif is_user_present(sus_value) and is_user_present(user_value):
+                    if sus_value > user_value:
+                        dataframe.loc[dataframe['name'] == user, column] = sus_value
+
+        dataframe = dataframe[dataframe['name'] != sus_user]
+        print("Merged " + sus_user + " into " + user)
+    return dataframe
 
         
 if __name__ == '__main__':
@@ -122,13 +198,27 @@ if __name__ == '__main__':
     else:
         data = {'name':users}
         df = pd.DataFrame(data)
+    # todo add option to run in background which ignores all this stuff
+    # print("Following users were found in the CSV but are not in the list of users:")
+    # susUsers = set(df['name']) - set(users)
+    # print(susUsers)
+    # if len(susUsers) > 0:
+    #     try_resolve_sus_users(df, susUsers, users)
 
-    print("Following users were found in the CSV but are not in the list of users:")
-    susUsers = set(df['name']) - set(users)
-
-    try_resolve_sus_users(df, susUsers)
-
-    exit(0)
+    # sus_users_mapping = {
+    #     "CrowAmasawa": "LordGwyn",
+    #     "CaptainTree": "Tree",
+    #     "DonJuwuan": "Tensarte",
+    #     "DatenshiCrow": "CrowSkirata",
+    #     "CrowSkirata": "CrowAmasawa",
+    #     "LiyuuSix": "Flacc",
+    #     "aviralgupta393": "Hachiken"
+    # }
+    # if len(sus_users_mapping) > 0:
+    #     df = merge_sus_users(df, sus_users_mapping)
+    #     df = df.replace(-1, np.nan) # remove values that are -1, should be saved as ,, in csv
+    #     df.to_csv(csvFilePath, index=False, float_format='%.0f')
+    #     exit(0)
 
     # creating new column for today's date
     if(df.columns[-1] != today):
@@ -146,8 +236,8 @@ if __name__ == '__main__':
         if(epCount != -1):
             df.loc[df['name'] == user,today] = epCount
 
-
-    df.to_csv(csvFilePath, index=False)
+    df = df.replace(-1, np.nan) # remove values that are -1, should be saved as ,, in csv
+    df.to_csv(csvFilePath, index=False, float_format='%.0f')
 
     script = 'display notification "Finished running ANILIST script" with title "Added all data to csv!"'
     p = Popen(['osascript', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE, universal_newlines=True)

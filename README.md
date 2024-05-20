@@ -93,3 +93,11 @@ As already mentioned everything should run daily automatically. To do this I set
 ```
 
 This agent runs [script.sh](script.sh) at 6pm every day. The script just runs the two python scripts showed above; if they fail it shows a notification.
+
+## 2024.03.21
+- Influx not running anymore (docker is too resource intensive - sqlite3 is not really an option - csv works already), just using csv
+- cleaning csv: adding utility methods for zombie users (which have renamed their account and dont exist anymore - but now there is a new user which i follow instead and for which i have past data)
+	- to find those users
+	- to find possible users they got replaced by
+	- to define which user has replaced who and merge their data
+- anilist introduced API limits in Feb, waiting for limit to reset when limit is reached when running
